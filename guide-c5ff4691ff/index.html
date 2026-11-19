@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive"><meta name="referrer" content="no-referrer">
+<title>分享手册</title><style>
+:root{color-scheme:light}body{min-height:90vh;display:grid;place-items:center;margin:0;background:#f8f6ef;color:#141915;font-family:FangSong,STFangsong,serif}main{max-width:28rem;margin:2rem}h1{font-size:2rem;letter-spacing:.12em;font-weight:500}p{font-size:1.05rem;line-height:1.8}button{font:inherit;color:inherit;background:transparent;border:1px solid #a5b3a6;padding:.5em 1.2em;cursor:pointer}
+</style></head><body><main><h1>分享手册</h1><p id="status" role="status">正在打开手册…</p><button id="retry" hidden>重新打开</button><noscript>请在支持 JavaScript 的浏览器中打开完整分享链接。</noscript></main><script>
+(() => {
+  const status = document.getElementById('status');
+  const retry = document.getElementById('retry');
+  const unlock = async () => {
+    retry.hidden = true;
+    const encoded = new URLSearchParams(location.hash.slice(1)).get('k');
+    if (!encoded || !/^[A-Za-z0-9_-]{43}$/.test(encoded)) {
+      status.textContent = '请打开分享者发来的完整链接，包括 # 后面的部分。'; return;
+    }
+    if (!window.crypto || !window.crypto.subtle) {
+      status.textContent = '请用系统浏览器通过 HTTPS 打开这条分享链接。'; return;
+    }
+    try {
+      status.textContent = '正在打开手册…';
+      const raw = Uint8Array.from(atob(encoded.replace(/-/g,'+').replace(/_/g,'/')+'='),c=>c.charCodeAt(0));
+      const key = await crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+      const openPart = async name => {
+        const res = await fetch(name,{credentials:'omit',referrerPolicy:'no-referrer'});
+        if (!res.ok) throw Error('fetch');
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        return crypto.subtle.decrypt({name:'AES-GCM',iv:bytes.slice(0,12),additionalData:new TextEncoder().encode(name)},key,bytes.slice(12));
+      };
+      const page = new TextDecoder().decode(await openPart('book.bin'));
+      window.readGuidePart = openPart;
+      document.open(); document.write(page); document.close();
+    } catch (_) {
+      status.textContent = '未能打开手册。请确认网络连接，并使用分享者发来的完整链接。';
+      retry.hidden = false;
+    }
+  };
+  retry.addEventListener('click',unlock); unlock();
+})();
+</script></body></html>
